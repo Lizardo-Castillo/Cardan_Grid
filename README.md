@@ -104,29 +104,171 @@ IJKL
 AZPW
 ```
 
-### 6. Proceso de Descifrado
+### 6. Proceso de Descifrado (Análisis Detallado)
 
-#### Lectura del archivo cifrado
-- **Funciones:** `readGrilleFromFile()` y `readEncryptedMatrix()`
-- Se extrae la rejilla original (posiciones marcadas con '0')
-- Se carga la matriz cifrada completa
+El descifrado es el proceso **inverso exacto** del cifrado. Es crucial entender que la rejilla funciona como una **llave maestra** que revela las posiciones exactas donde se colocó el mensaje original.
 
-#### Extracción del mensaje
-- **Función:** `decryptWithCardanGrille()`
-- **Proceso:**
-  1. Se aplica la rejilla en su posición inicial
-  2. Se extraen los caracteres visibles a través de los agujeros
-  3. Se rota la rejilla 90° y se repite
-  4. Se continúa hasta completar las 4 rotaciones
-  5. Se concatenan todos los caracteres extraídos
+#### 6.1. Lectura y Reconstrucción del Archivo Cifrado
 
-#### Eliminación del padding
-- Se trunca el mensaje desencriptado al tamaño original usando `substr(0, originalSize)`
-- Esto elimina los caracteres aleatorios que se agregaron durante el padding
+##### Función `readGrilleFromFile()`
+```cpp
+vector<pair<int,int>> readGrilleFromFile(const string& filename, int& sizeOriginal, int& gridSize)
+```
 
-#### Guardado del resultado
-- **Archivo de salida:** `MENSAJE_DESCIFRADO.txt`
-- Contiene únicamente el mensaje original sin padding ni caracteres de relleno
+**Proceso paso a paso:**
+1. **Lee los metadatos:** Las primeras dos líneas del archivo contienen:
+   - `sizeOriginal`: El tamaño real del mensaje antes del padding
+   - `gridSize`: Las dimensiones de la rejilla cuadrada
+
+2. **Reconstruye la rejilla:** Examina cada carácter de la matriz de rejilla:
+   - **'0'** = Posición con agujero (donde se colocaron letras del mensaje)
+   - **'#'** = Posición bloqueada (donde se colocaron letras aleatorias)
+
+3. **Almacena coordenadas:** Cada vez que encuentra un '0', guarda las coordenadas `(fila, columna)` en un vector
+
+**Ejemplo de lectura:**
+```
+Archivo: MENSAJE-CIFRADO.txt
+10        ← sizeOriginal = 10
+4         ← gridSize = 4
+0##0      ← Fila 0: agujeros en (0,0) y (0,3)
+#00#      ← Fila 1: agujeros en (1,1) y (1,2)
+#00#      ← Fila 2: agujeros en (2,1) y (2,2)
+0##0      ← Fila 3: agujeros en (3,0) y (3,3)
+```
+
+**Resultado:** `rejilla = [(0,0), (0,3), (1,1), (1,2), (2,1), (2,2), (3,0), (3,3)]`
+
+##### Función `readEncryptedMatrix()`
+```cpp
+vector<vector<char>> readEncryptedMatrix(const string& filename, int gridSize)
+```
+
+**Proceso:**
+1. **Salta los metadatos:** Lee y descarta las primeras líneas (tamaños y rejilla)
+2. **Carga la matriz cifrada:** Lee las siguientes `gridSize` líneas que contienen la matriz con:
+   - Caracteres del mensaje original
+   - Caracteres de relleno aleatorios
+
+**Ejemplo:**
+```
+XMYB      ← Fila 0 de la matriz cifrada
+QFGH      ← Fila 1 de la matriz cifrada
+IJKL      ← Fila 2 de la matriz cifrada
+AZPW      ← Fila 3 de la matriz cifrada
+```
+
+#### 6.2. Proceso de Extracción del Mensaje
+
+##### Función `decryptWithCardanGrille()`
+```cpp
+string decryptWithCardanGrille(const vector<vector<char>>& matrix, vector<pair<int,int>> grille, int gridSize)
+```
+
+Esta es la función **más crítica** del descifrado. Aquí está el análisis detallado:
+
+**Bucle principal:** Se ejecuta exactamente 4 veces (una por cada rotación)
+
+##### **ROTACIÓN 0 (Posición Original)**
+1. **Ordenamiento de la rejilla:**
+   ```cpp
+   vector<pair<int,int>> sortedGrille = grille;
+   sort(sortedGrille.begin(), sortedGrille.end());
+   ```
+   - **Propósito:** Garantiza que se lean los caracteres en orden correcto (izquierda→derecha, arriba→abajo)
+   - **Ejemplo:** `[(0,0), (0,3), (1,1), (1,2), (2,1), (2,2), (3,0), (3,3)]`
+
+2. **Extracción de caracteres:**
+   ```cpp
+   for(const auto& pos : sortedGrille) {
+       decryptedText += matrix[pos.first][pos.second];
+   }
+   ```
+   - Lee cada posición de la matriz cifrada donde hay un agujero
+   - **Ejemplo:** Si la rejilla apunta a `(0,0), (0,3), (1,1)...` extrae `X, B, F...`
+
+##### **ROTACIÓN 1 (90° en sentido horario)**
+3. **Rotación de la rejilla:**
+   ```cpp
+   rotateGrille90Degrees(grille, gridSize);
+   ```
+   - **Transformación matemática:** `(fila, col) → (col, gridSize - fila - 1)`
+   - **Ejemplo:** `(0,0) → (0,3)`, `(0,3) → (3,3)`, `(1,1) → (1,2)`
+
+4. **Nueva extracción:** Se repite el proceso con las nuevas posiciones rotadas
+
+##### **ROTACIONES 2 y 3 (180° y 270°)**
+5. **Continúa el proceso:** Se aplican las rotaciones restantes, extrayendo más caracteres
+
+#### 6.3. Ejemplo Completo de Descifrado
+
+Supongamos que tenemos esta matriz cifrada:
+```
+T E S X
+R A N Y
+D B C Z
+Q M W F
+```
+
+Y esta rejilla (posiciones con '0'):
+```
+0 # # 0
+# 0 0 #
+# 0 0 #
+0 # # 0
+```
+
+**Proceso detallado:**
+
+##### **ROTACIÓN 0:**
+- **Posiciones de agujeros:** `(0,0), (0,3), (1,1), (1,2), (2,1), (2,2), (3,0), (3,3)`
+- **Caracteres extraídos:** `T, X, A, N, B, C, Q, F`
+- **Mensaje parcial:** `"TXANBCQF"`
+
+##### **ROTACIÓN 1 (90°):**
+- **Posiciones rotadas:** `(0,3) → (3,3)`, `(0,0) → (0,3)`, etc.
+- **Nuevas posiciones:** `(0,3), (3,3), (1,2), (2,1), (1,1), (2,2), (3,0), (0,0)`
+- **Caracteres extraídos:** `X, F, N, B, A, C, Q, T`
+- **Mensaje parcial:** `"TXANBCQF" + "XFNBACQT"`
+
+##### **ROTACIONES 2 y 3:**
+- Se continúa el proceso hasta completar las 4 rotaciones
+- **Resultado:** Cadena completa con todos los caracteres del mensaje original + padding
+
+#### 6.4. Eliminación del Padding y Finalización
+
+##### Truncamiento al tamaño original
+```cpp
+decryptedMessage = decryptedMessage.substr(0, originalSize);
+```
+
+**¿Por qué funciona esto?**
+- Durante el cifrado, el mensaje se rellenó con caracteres aleatorios
+- El `originalSize` se guardó antes del padding
+- Al truncar, se eliminan automáticamente los caracteres de relleno
+- **Ejemplo:** Si `originalSize = 10` y el mensaje descifrado es `"TESTABCDE!XY"`, se trunca a `"TESTABCDE!"`
+
+##### Guardado final
+```cpp
+ofstream outDecrypted("MENSAJE_DESCIFRADO.txt");
+outDecrypted << decryptedMessage;
+```
+
+#### 6.5. ¿Por Qué Funciona el Descifrado?
+
+**Principio fundamental:** La rejilla de Cardano garantiza que:
+
+1. **Cada posición se usa exactamente una vez por rotación**
+2. **No hay solapamientos entre rotaciones**
+3. **El orden de llenado se preserva mediante el ordenamiento**
+4. **Las rotaciones matemáticas son exactamente inversas al cifrado**
+
+**Matemáticamente:**
+- Si durante el cifrado se colocó el carácter `C` en la posición `(i,j)` durante la rotación `R`
+- Durante el descifrado, la rotación `R` volverá a exponer exactamente la posición `(i,j)`
+- El ordenamiento garantiza que `C` se extraiga en la posición correcta de la secuencia
+
+**Resultado:** El mensaje se reconstruye **carácter por carácter** en el orden exacto en que se cifró.
 
 ## Archivos Involucrados
 
