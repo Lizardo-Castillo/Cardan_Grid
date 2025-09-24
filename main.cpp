@@ -150,6 +150,7 @@ void concatenar(fstream &in, string &word){
     }
 }
 
+/////////// DESENCRIPTACIÓN ///////////
 vector<pair<int,int>> readGrilleFromFile(const string& filename, int& sizeOriginal, int& gridSize) {
     ifstream in(filename);
     in >> sizeOriginal >> gridSize;
@@ -211,7 +212,7 @@ string decryptWithCardanGrille(const vector<vector<char>>& matrix, vector<pair<i
     
     return decryptedText;
 }
-
+////////////////////////////////////////
 
 int main() {
     srand(time(0));
